@@ -92,7 +92,12 @@ jobs:
             PLATFORM_ARG="--platform linux/amd64"
           fi
 
-          docker buildx build $PLATFORM_ARG -t $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$IMAGE_NAME:${{ github.sha }} .
+          export DOCKER_BUILDKIT=1
+
+          docker buildx create --use
+          docker buildx build $PLATFORM_ARG --load -t $ECR_REGISTRY/$IMAGE_NAME:${{ github.sha }} .
+          
+          docker images | grep $IMAGE_NAME
 
       - name: Push Docker Image to AWS ECR
         id: push-image
@@ -100,4 +105,5 @@ jobs:
             ECR_REGISTRY: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com
             IMAGE_NAME: superset
         run: |
+            docker images | grep $IMAGE_NAME
             docker push $ECR_REGISTRY/$IMAGE_NAME:${{ github.sha }}
