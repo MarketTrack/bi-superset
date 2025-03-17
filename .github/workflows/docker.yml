@@ -41,6 +41,7 @@ jobs:
       AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
       AWS_REGION: ${{ secrets.AWS_REGION }}
       IMAGE_NAME: superset
+      IMAGE_TAG: superset:GHA-${{ matrix.build_preset }}-${{ github.run_id }}
 
     steps:
 
@@ -98,7 +99,7 @@ jobs:
           export DOCKER_BUILDKIT=1
 
           docker buildx create --use
-          docker buildx build $PLATFORM_ARG $PUSH_OR_LOAD -t $ECR_REGISTRY/$IMAGE_NAME:${{ github.sha }} .
+          docker buildx build $PLATFORM_ARG $PUSH_OR_LOAD -t $ECR_REGISTRY/$IMAGE_NAME:$IMAGE_TAG .
 
           docker images | grep $IMAGE_NAME
 
@@ -109,4 +110,4 @@ jobs:
             IMAGE_NAME: superset
         run: |
             docker images | grep $IMAGE_NAME
-            docker push $ECR_REGISTRY/$IMAGE_NAME:${{ github.sha }}
+            docker push $ECR_REGISTRY/$IMAGE_NAME:$IMAGE_TAG
