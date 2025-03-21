@@ -19,20 +19,20 @@ permissions:
 
 jobs:
   setup_matrix:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     outputs:
       matrix_config: ${{ steps.set_matrix.outputs.matrix_config }}
     steps:
       - id: set_matrix
         run: |
-          MATRIX_CONFIG=$(if [ "${{ github.event_name }}" == "pull_request" ]; then echo '["dev"]'; else echo '["dev", "lean", "py310", "websocket", "dockerize", "py311"]'; fi)
+          MATRIX_CONFIG=$(if [ "${{ github.event_name }}" == "pull_request" ]; then echo '["dev", "lean"]'; else echo '["dev", "lean", "py310", "websocket", "dockerize", "py311"]'; fi)
           echo "matrix_config=${MATRIX_CONFIG}" >> $GITHUB_OUTPUT
           echo $GITHUB_OUTPUT
 
   docker-build:
     name: docker-build
     needs: setup_matrix
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     strategy:
       matrix:
         build_preset: ${{fromJson(needs.setup_matrix.outputs.matrix_config)}}
@@ -41,6 +41,7 @@ jobs:
       AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
       AWS_REGION: ${{ secrets.AWS_REGION }}
       IMAGE_NAME: superset
+      IMAGE_TAG: GHA-${{ matrix.build_preset }}-${{ github.run_id }}
 
     steps:
 
@@ -55,9 +56,9 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Set up QEMU
-        # if: steps.check.outputs.python || steps.check.outputs.frontend || steps.check.outputs.docker
-        uses: docker/setup-qemu-action@v3
+      # - name: Set up QEMU
+      #   # if: steps.check.outputs.python || steps.check.outputs.frontend || steps.check.outputs.docker
+      #   uses: docker/setup-qemu-action@v3
 
       - name: Set up Docker Buildx
         # if: steps.check.outputs.python || steps.check.outputs.frontend || steps.check.outputs.docker
@@ -88,15 +89,18 @@ jobs:
           # Single platform builds in pull_request context to speed things up
           if [ "${{ github.event_name }}" = "push" ]; then
             PLATFORM_ARG="--platform linux/arm64 --platform linux/amd64"
+            # can only --load images in single-platform builds
+            PUSH_OR_LOAD="--push"
           elif [ "${{ github.event_name }}" = "pull_request" ]; then
             PLATFORM_ARG="--platform linux/amd64"
+            PUSH_OR_LOAD="--load"
           fi
 
           export DOCKER_BUILDKIT=1
 
           docker buildx create --use
-          docker buildx build $PLATFORM_ARG --load -t $ECR_REGISTRY/$IMAGE_NAME:${{ github.sha }} .
-          
+          docker buildx build $PLATFORM_ARG $PUSH_OR_LOAD -t $ECR_REGISTRY/$IMAGE_NAME:$IMAGE_TAG .
+
           docker images | grep $IMAGE_NAME
 
       - name: Push Docker Image to AWS ECR
@@ -106,4 +110,4 @@ jobs:
             IMAGE_NAME: superset
         run: |
             docker images | grep $IMAGE_NAME
-            docker push $ECR_REGISTRY/$IMAGE_NAME:${{ github.sha }}
+            docker push $ECR_REGISTRY/$IMAGE_NAME:$IMAGE_TAG

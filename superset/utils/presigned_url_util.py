@@ -1,6 +1,7 @@
 import logging
 import requests
 import json
+import os
 
 logger = logging.getLogger(__name__)
 
@@ -16,13 +17,14 @@ def make_request(uri, method, headers=None, data=None):
         return f"Error: {str(e)}"
 
 def get_api_token():
-    uri = "https://reports.bi.numerator.cloud/api/token/"
-    data = {'username': 'spotfire_maestro_image', 'password': 'BAQN0I8LbF70it#,7^(?'}
-    response = make_request(uri, "POST", data=data)
+    token_uri = os.getenv('BIPORTAL_TOKEN_URI', 'https://reports.bi.numerator.cloud/api/token/')
+    username = os.getenv('BIPORTAL_USERNAME', 'dummy_user')
+    password = os.getenv('BIPORTAL_PASSWORD', 'dummy_password')
+    data = {'username': username, 'password': password}
+    response = make_request(token_uri, "POST", data=data)
     try:
         response_json = json.loads(response)
         logger.warning(f"*#*#*** in the get api token {response_json}", exc_info=True)
-        #print('*#*#*** in the get api token')
         # Check if 'access' is in the response, else return the full error message
         if 'access' in response_json:
             return response_json['access']
@@ -37,13 +39,13 @@ def get_api_token():
         return f"Error: {str(e)}"
 
 def get_presigned_url(token, urls):
-    uri = "https://reports.bi.numerator.cloud/get-presigned-urls/"
+    presigned_uri = os.getenv('BIPORTAL_PRESIGNED_URI', 'https://reports.bi.numerator.cloud/get-presigned-urls/')
     headers = {"Authorization": f"Bearer {token}"}
     data = {"s3_urls": urls}
-    return make_request(uri, "POST", headers=headers, data=data)
+    return make_request(presigned_uri, "POST", headers=headers, data=data)
+
 
 def get_image_func(image_links):
-    #print('*#*#*** duck duck in the get api token')
     logger.warning("*#*#*** duck duck in the get api token", exc_info=True)
     token = get_api_token()
     if image_links != '(Empty)' and ("key" in image_links):
